@@ -25,13 +25,28 @@ It wrote the code, ran away, and now the game is unplayable.
 
 ## 📝 Document Your Experience
 
-- [ ] Describe the game's purpose.
-- [ ] Detail which bugs you found.
-- [ ] Explain what fixes you applied.
+**Game Purpose:**
+This is a number guessing game where the player tries to guess a randomly generated secret number within a limited number of attempts. The difficulty level controls the number range and how many guesses you get. Each wrong guess before winning deducts points, so the fewer attempts you use, the higher your final score.
+
+**Bugs Found:**
+1. **Backwards hints** — `check_guess` returned "Go LOWER" when the guess was too low and "Go HIGHER" when too high, the exact opposite of correct behavior. This made the game unwinnable through normal play.
+2. **Broken score deduction** — `update_score` divided 100 by a difficulty rank (1/2/3) instead of the actual attempt limit, so Normal mode deducted 50 pts per wrong guess instead of the correct 16.
+3. **`check_guess` not implemented in `logic_utils.py`** — the function was a stub raising `NotImplementedError`, which caused all three starter pytest tests to fail immediately.
+4. **Score updated on wrong guesses** — the original code added/deducted points mid-game on every wrong guess instead of only computing points at the moment of winning.
+
+**Fixes Applied:**
+1. Implemented `check_guess` in `logic_utils.py` to return the correct outcome string (`"Win"`, `"Too High"`, `"Too Low"`), matching the test expectations.
+2. Replaced `DIFFICULTY_LEVEL = {Easy:1, Normal:2, Hard:3}` with `ATTEMPT_LIMIT = {Easy:8, Normal:6, Hard:5}` and computed `deduction_per_wrong = int(100 / ATTEMPT_LIMIT[difficulty])`.
+3. Simplified `update_score` to only award points on a win, eliminating mid-game score drift from wrong guesses.
+4. Added 9 regression tests covering all three difficulties, the score floor at 0, and wrong-guess no-ops — all 12 tests now pass.
 
 ## 📸 Demo
 
-- [ ] [Insert a screenshot of your fixed, winning game here]
+![Winning game](assets/game_win.png)
+
+pytest results — 12/12 tests passing:
+
+![pytest results](assets/test_case_pass.png)
 
 ## 🚀 Stretch Features
 

@@ -38,15 +38,18 @@ The AI helped design the regression suite by suggesting specific boundary cases:
 
 ## 4. What did you learn about Streamlit and state?
 
-- In your own words, explain why the secret number kept changing in the original app.
-- How would you explain Streamlit "reruns" and session state to a friend who has never used Streamlit?
-- What change did you make that finally gave the game a stable secret number?
+In the original app, the secret number was generated with `random.randint(low, high)` at the top level of the script without any guard. Every time the user clicked "Submit", Streamlit re-ran the entire script from top to bottom, so a new random number was picked on every interaction — the secret kept changing before you could win.
+
+Streamlit "reruns" work like this: imagine a chef who re-cooks the entire meal from scratch every time you ask for a bite. The code runs start to finish on every user action, not just the part that changed. `st.session_state` is like a sticky notepad that survives across these re-runs — you write a value to it once, and on every subsequent rerun the notepad still has that value instead of generating a fresh one.
+
+The fix was wrapping the secret number generation in a guard: `if "secret" not in st.session_state: st.session_state.secret = random.randint(low, high)`. This means the random number is only generated the very first time the page loads; every rerun after that reads the saved value from `session_state` instead of picking a new one.
 
 ---
 
 ## 5. Looking ahead: your developer habits
 
-- What is one habit or strategy from this project that you want to reuse in future labs or projects?
-  - This could be a testing habit, a prompting strategy, or a way you used Git.
-- What is one thing you would do differently next time you work with AI on a coding task?
-- In one or two sentences, describe how this project changed the way you think about AI generated code.
+One habit I want to carry forward is writing a regression test immediately after fixing a bug — before moving on. The test `test_normal_second_attempt_deducts_16_not_50` took about two minutes to write and would have caught the original broken divisor automatically on every future run. Without it, the same bug could silently come back in a refactor and I would only notice by playing the game manually.
+
+Next time I work with AI on a coding task, I would verify the AI's output against a concrete example before accepting it. In this project I accepted the first score fix and only caught the wrong divisor after actually running the game and seeing an unexpected result. A 30-second sanity check — "what should Normal second-attempt score be? 84. Does this code produce 84?" — would have caught the issue instantly without a full play-through.
+
+This project changed how I think about AI-generated code: I now treat it as a capable first draft that still needs a human reviewer, not a finished answer. The AI wrote confident, syntactically correct code that was logically wrong — and the only way to catch that was to test it against real expectations, not just read it and assume it was right.
