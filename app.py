@@ -35,32 +35,29 @@ def check_guess(guess, secret):
 
     try:
         if guess > secret:
-            return "Too High", "📈 Go HIGHER!"
+            return "Too High", "📉 Go LOWER!"
         else:
-            return "Too Low", "📉 Go LOWER!"
+            return "Too Low", "📈 Go HIGHER!"
     except TypeError:
-        g = str(guess)
-        if g == secret:
+        if guess == int(secret):
             return "Win", "🎉 Correct!"
-        if g > secret:
-            return "Too High", "📈 Go HIGHER!"
-        return "Too Low", "📉 Go LOWER!"
+        if guess > int(secret):
+            return "Too High", "📉 Go LOWER!"
+        return "Too Low", "📈 Go HIGHER!"
 
 
-def update_score(current_score: int, outcome: str, attempt_number: int):
+# FIX: I described the scoring rule to the AI: 100 pts on first correct attempt,
+# deduct int(100 / attempt_limit) per wrong guess. The AI identified that the
+# original code used a difficulty rank (1/2/3) as the divisor instead of the
+# actual attempt limit, and rewrote the function with the correct divisor.
+ATTEMPT_LIMIT = {"Easy": 8, "Normal": 6, "Hard": 5}
+
+def update_score(current_score: int, outcome: str, attempt_number: int, difficulty: str):
     if outcome == "Win":
-        points = 100 - 10 * (attempt_number + 1)
-        if points < 10:
-            points = 10
+        deduction_per_wrong = int(100 / ATTEMPT_LIMIT[difficulty])
+        wrong_attempts = attempt_number - 1
+        points = max(0, 100 - wrong_attempts * deduction_per_wrong)
         return current_score + points
-
-    if outcome == "Too High":
-        if attempt_number % 2 == 0:
-            return current_score + 5
-        return current_score - 5
-
-    if outcome == "Too Low":
-        return current_score - 5
 
     return current_score
 
@@ -78,8 +75,8 @@ difficulty = st.sidebar.selectbox(
 )
 
 attempt_limit_map = {
-    "Easy": 6,
-    "Normal": 8,
+    "Easy": 8,
+    "Normal": 6,
     "Hard": 5,
 }
 attempt_limit = attempt_limit_map[difficulty]
@@ -91,9 +88,8 @@ st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 
 if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
-
 if "attempts" not in st.session_state:
-    st.session_state.attempts = 1
+    st.session_state.attempts = 0
 
 if "score" not in st.session_state:
     st.session_state.score = 0
@@ -104,10 +100,12 @@ if "status" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
-st.subheader("Make a guess")
+if "hint" not in st.session_state:
+    st.session_state.hint = None
 
+st.subheader("Make a guess")
 st.info(
-    f"Guess a number between 1 and 100. "
+    f"Guess a number between {low} and {high}. "
     f"Attempts left: {attempt_limit - st.session_state.attempts}"
 )
 
@@ -131,9 +129,16 @@ with col2:
 with col3:
     show_hint = st.checkbox("Show hint", value=True)
 
+if show_hint and st.session_state.get("hint"):
+    st.warning(st.session_state.hint)
+
 if new_game:
     st.session_state.attempts = 0
-    st.session_state.secret = random.randint(1, 100)
+    st.session_state.secret = random.randint(low, high)
+    st.session_state.score = 0
+    st.session_state.status = "playing"
+    st.session_state.history = []
+    st.session_state.hint = None
     st.success("New game started.")
     st.rerun()
 
@@ -145,47 +150,53 @@ if st.session_state.status != "playing":
     st.stop()
 
 if submit:
-    st.session_state.attempts += 1
-
-    ok, guess_int, err = parse_guess(raw_guess)
-
-    if not ok:
-        st.session_state.history.append(raw_guess)
-        st.error(err)
+    if st.session_state.attempts >= attempt_limit:
+        st.error("No attempts left! Start a new game.")
     else:
-        st.session_state.history.append(guess_int)
+        st.session_state.attempts += 1
 
-        if st.session_state.attempts % 2 == 0:
-            secret = str(st.session_state.secret)
+        ok, guess_int, err = parse_guess(raw_guess)
+
+        if not ok:
+            st.session_state.history.append(raw_guess)
+            st.error(err)
         else:
-            secret = st.session_state.secret
+            st.session_state.history.append(guess_int)
 
-        outcome, message = check_guess(guess_int, secret)
+            if st.session_state.attempts % 2 == 0:
+                secret = str(st.session_state.secret)
+            else:
+                secret = st.session_state.secret
 
-        if show_hint:
-            st.warning(message)
+            outcome, message = check_guess(guess_int, secret)
 
-        st.session_state.score = update_score(
-            current_score=st.session_state.score,
-            outcome=outcome,
-            attempt_number=st.session_state.attempts,
-        )
+            if show_hint:
+                st.session_state.hint = message
 
-        if outcome == "Win":
-            st.balloons()
-            st.session_state.status = "won"
-            st.success(
-                f"You won! The secret was {st.session_state.secret}. "
-                f"Final score: {st.session_state.score}"
+            st.session_state.score = update_score(
+                current_score=st.session_state.score,
+                outcome=outcome,
+                attempt_number=st.session_state.attempts,
+                difficulty=difficulty,
             )
-        else:
-            if st.session_state.attempts >= attempt_limit:
+
+            if outcome == "Win":
+                st.balloons()
+                st.session_state.status = "won"
+                st.success(
+                    f"You won! The secret was {st.session_state.secret}. "
+                    f"Final score: {st.session_state.score}"
+                )
+            elif st.session_state.attempts >= attempt_limit:
                 st.session_state.status = "lost"
                 st.error(
                     f"Out of attempts! "
                     f"The secret was {st.session_state.secret}. "
                     f"Score: {st.session_state.score}"
                 )
+
+        if st.session_state.status == "playing":
+            st.rerun()
 
 st.divider()
 st.caption("Built by an AI that claims this code is production-ready.")
